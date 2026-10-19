@@ -1,0 +1,525 @@
+---
+title: "ELABORATO DI GRUPPO MSA, GRUPPO 3"
+
+date: "2024-07-17"
+output:
+  html_document: default
+  pdf_document: default
+editor_options: 
+  markdown: 
+    wrap: sentence
+---
+
+```{r Setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+## **Introduzione del dataset:**
+
+I dati riportati provengono dal dataset "Affairs" incluso nel pacchetto "AER" il quale fa riferimento allo studio su le coppie sposate per comprendere ed analizzare i fattori che influenzano il comportamento della infedeltà coniugale.
+
+**Descrizione dataset**: Il dataset riporta informazioni su diverse variabili legate al comportamento di infedeltà in un campione di individui sposati,le principali variabili analizzate sono le seguenti:
+
+-   **Affairs**: n° di relazioni extra-coniugali.
+
+-   **Gender**: genere dell'individuo (maschio/femmina).
+
+-   **Age** : età dell'individuo.
+
+-   **Yearsmarried**: n° anni di matrimonio.
+
+-   **Children**: indica se la coppia ha figli oppure no (yes/no).
+
+-   **Religiousness**: livello di religiosità su una scala da 1 a 5.
+
+-   **Education**: I livelli di istruzione variano dai 9 anni (scuola media) a 20 anni (dottorato di ricerca)..
+
+-   **Occupation**: livello di occupazione su una scala da 1 a 7.
+
+-   **Rating**: auto-valutazione della qualità del proprio matrimonio su una scala da 1 a 5.
+
+```{r Affairs}
+library(AER)
+data("Affairs", package = "AER")
+summary(Affairs)
+```
+
+**Trasformazione delle variabili** *gender* e *children* in **factor** (variabili dummy) per poter poi effettuare una appropriata regressione :
+
+```{r Trasformazione variabili, echo=TRUE}
+Affairs$gender <- factor(Affairs$gender)
+Affairs$children <- factor(Affairs$children, levels = c("no", "yes"))
+
+```
+
+**Boxplot** delle variabili
+
+```{r Boxplot delle variabili, echo=TRUE}
+par(mfrow= c(2,4))
+for (col in names(Affairs)){
+  if (is.numeric(Affairs[[col]])) {
+    boxplot(Affairs[[col]], main = col,ylab = "valori" , col = "skyblue")}}
+
+```
+
+Passiamo ad un'altra distribuzione grafica delle variabili, i loro relativi **istogrammi**
+
+```{r Istogrammi delle variabili, echo=TRUE}
+par(mfrow= c (3,3))
+for (col in names(Affairs)) {
+  if (is.numeric(Affairs[[col]])) {
+    hist(Affairs[[col]], main = paste("istogramma di", col),
+         xlab = col,col="lightblue",border = "black")}}
+
+```
+
+Si può notare che sia dai boxplot e che (in parte) dai singoli istogrammi, ci siano degli outliers.
+Per cui, procediamo con la **eliminazione degli outliers** utilizzando il **metodo IQR** (Interquantile Range):
+
+```{r Calcolo dei limiti per gli outliers, echo=TRUE}
+# Funzione per identificare gli outlier usando l'IQR
+identify_outliers <- function(data, variable) {
+  Q1 <- quantile(data[[variable]], 0.18)
+  Q3 <- quantile(data[[variable]], 0.82)
+  IQR <- Q3 - Q1
+  lower_bound <- Q1 - 1.5 * IQR
+  upper_bound <- Q3 + 1.5 * IQR
+  return(data[[variable]] < lower_bound | data[[variable]] > upper_bound)
+}
+```
+
+```{r Rimozione outliers dal dataset, echo=TRUE}
+
+# Identificare e rimuovere gli outlier nel dataset
+outlier_indices <- sapply(names(Affairs), function(var) {
+  if (is.numeric(Affairs[[var]])) {identify_outliers(Affairs, var)} else {rep(FALSE, nrow(Affairs))}})
+outlier_indices <- rowSums(outlier_indices) > 0
+Affairs_clean <- Affairs[!outlier_indices, ]
+
+# Verifica delle dimensioni del dataset pulito
+dim(Affairs_clean)
+```
+
+Per ottenere, invece, una rappresentazione grafica del modello “pulito”, possiamo creare il relativo **istogramma senza outliers**:
+
+```{r Istogramma senza outliers, echo=TRUE}
+# Istogramma senza outliers
+library(ggplot2)
+ggplot(Affairs_clean, aes(x=affairs)) +
+  geom_histogram(binwidth = 1, fill = "blue", color = "black", alpha = 0.7) +
+  labs(title = "Istogramma della Variabile 'affairs' (senza outliers) ", 
+       x = "Numero di Relazioni Extraconiugali", y = "Frequenza") +   theme_minimal()
+dim(Affairs_clean)
+table(Affairs_clean$affairs)
+
+```
+
+Evidenziamo la netta differenza con l'**istogramma** della variavile "affair" ma con gli outliers:
+
+```{r Istogramma del dataset con outliers, echo=TRUE}
+library(ggplot2)
+ggplot(Affairs, aes(x=affairs)) +
+  geom_histogram(binwidth = 1, fill = "blue", color = "black", alpha = 0.7) +
+  labs(title = "Istogramma della Variabile 'affairs' ", x = "Numero di Relazioni Extraconiugali", y = "Frequenza") +
+  theme_minimal()
+dim(Affairs)
+table(Affairs$affairs)
+```
+
+Dopodichè possiamo rifare i passaggi e analisi sulle variabili ma anche'esse senza outliers:
+
+```{r Boxplot varibili MA senza outliers, echo=TRUE}
+par(mfrow= c(2,4))
+for (col in names(Affairs_clean)){
+  if (is.numeric(Affairs_clean[[col]])) {
+    boxplot(Affairs_clean[[col]], main = col,ylab = "valori" , col = "skyblue")}}
+
+```
+
+```{r Istogrammi delle variabili MA senza outliers, echo=TRUE}
+par(mfrow= c (3,3))
+for (col in names(Affairs_clean)) {
+  if (is.numeric(Affairs_clean[[col]])) {
+    hist(Affairs_clean[[col]], main = paste("istogramma di", col),
+         xlab = col,col="lightblue",border = "black")}}
+
+```
+
+Infine, creiamo una **Tabella di correlazione**:
+
+```{r Tabella di correlazione, echo=TRUE}
+continuous_vars <- c("age", "yearsmarried", "religiousness", "education", "occupation", "rating")
+library(knitr)
+library(corrplot)
+cor_table <- cor(Affairs_clean[continuous_vars])
+kable(cor_table[,1])
+corrplot(cor_table, method = "color", type = "upper", tl.col = "black", tl.srt = 45, addCoef.col = "black", number.cex = 0.7)
+
+```
+
+## **REGRESSIONE**
+
+Infine, passiamo alla **Regressione**.
+Utilizzeremo un modello di regressione logistica:
+
+$$
+logit(affairs) =\beta_0+\beta_1\cdot gender +\beta_2\cdot age +\beta_3\cdot yearsmarried+\beta_4\cdot children +\beta_5\cdot religiousness +\beta_6\cdot education +\beta_7\cdot occupation +\beta_8\cdot rating
+$$
+
+```{r Regressione logistica, echo=TRUE}
+
+# Aggiungiamo una variabile binaria per la regressione logistica
+Affairs_clean$affair <- ifelse(Affairs_clean$affairs > 0, 1, 0)
+
+# Visualizziamo la struttura del dataset
+str(Affairs_clean)
+
+# Eseguiamo la regressione logistica
+model <- glm(affair ~ gender + age + yearsmarried + children + religiousness + education + occupation + rating,
+             family = binomial(link = "logit"),
+             data = Affairs_clean)
+
+# Sommario del modello
+summary(model)
+```
+
+-   **GENDER MALE**: questo 0.658 ci dice che essere maschio aumenta la probabilità di avere una relazione extraconiugale di 0.658 rispetto ad essere femmina, tenendo costanti tutti gli altri fattori.
+
+-   **AGE**: questo -0.046 ci dice che con l'aumento dell’età, la probabilità di avere una relazione extraconiugale diminuisce di 0.046 per ogni anno in più, tenendo costanti tutti gli altri fattori.
+
+-   **CHILDREN YES**: questo 0.716 ci dice che avere figli aumenta la probabilità di avere una relazione extraconiugale di 0.716 rispetto a non avere figli, tenendo costanti tutti gli altri fattori.
+
+-   **RATING**: questo -0.351 ci dice che con l'aumento del punteggio di soddisfazione matrimoniale, la probabilità di avere una relazione extraconiugale diminuisce di 0.351 per ogni punto aggiuntivo nella valutazione, tenendo costanti tutti gli altri fattori.
+
+
+```{r Visualizzazione grafica del modello ligistico, echo=TRUE}
+#visualizziamo graficamente il modello realizzato
+plot(model, lwd=2)
+```
+
+
+
+#### **Omoschedasticità o Eteroschedasticità ?**
+
+Osserviamo dai grafici come il primo modello (model) sembrerebbe non adattarsi del tutto bene ai dati.
+
+Per cui, rifacciamo la stessa regressione MA decidiamo di usare solo le **variabili significative**, anche se evidentemente "poco" significative:
+
+**REGRESSIONE LOGISTICA SEMPLIFICATA**
+
+$$
+logit(affairs) =\beta_0+\beta_1\cdot gender +\beta_2\cdot age +\beta_3\cdot children +\beta_4\cdot rating
+$$
+
+```{r Regressione logistica semplificata, echo=TRUE}
+#Regressione solo con variabili significative
+model2 <- glm(affair ~ gender + age + children + rating,
+             family = binomial(link = "logit"),
+             data = Affairs_clean)
+summary(model2)
+
+```
+
+-   **GENDER MALE**: questo 0.536 ci dice che essere maschio aumenta la probabilità di avere una relazione extraconiugale di 0.536 rispetto ad essere femmina, tenendo costanti tutti gli altri fattori.
+
+-   **AGE**: questo -0.033 ci dice che con l'aumento dell’età, la probabilità di avere una relazione extraconiugale diminuisce di 0.033 per ogni anno in più, tenendo costanti tutti gli altri fattori.
+
+-   **CHILDREN YES**: questo 0.847 ci dice che avere figli aumenta la probabilità di avere una relazione extraconiugale di 0.847 rispetto a non avere figli, tenendo costanti tutti gli altri fattori.
+
+-   **RATING**: questo -0.367 ci dice che con l'aumento del punteggio di soddisfazione matrimoniale, la probabilità di avere una relazione extraconiugale diminuisce di 0.367 per ogni punto aggiuntivo nella valutazione, tenendo costanti tutti gli altri fattori.
+
+
+```{r Visualizzazione modello semplificato, echo=TRUE}
+plot(model2, lwd=2)
+
+```
+
+
+
+Nonostante la semplificazione del modello, osserviamo da questi grafici come vi sia ancora una forte presenza di outliers che il modello non riesce a catturare.
+Proviamo ad introdurre un **termine d'interazione** e confrontiamo i risultati: 
+
+
+$$
+logit(affairs) =\beta_0+\beta_1\cdot gender +\beta_2\cdot children +\beta_3\cdot (rating\cdot age)
+$$
+
+
+```{r Modello logistico con interazione, echo=TRUE}
+#Regressione logistica con termine d'interazione
+model2_interaction <- glm(affair ~ gender + children + rating * age,
+             family = binomial(link = "logit"),
+             data = Affairs_clean)
+summary(model2_interaction)
+plot(model2_interaction, lwd =2)
+```
+
+
+Anche con questo modello non siamo riusciti ad eliminare questi valori critici... una possibile causa potrebbe essere il non aver incluso nello studio effettuato variabili importanti che influenzano fortemente "affair".
+
+
+Creiamo un **grafico a dispersione** fra la Y = "affair" e la X = "rating".
+
+Perchè proprio "rating"?
+
+```{r Grafico a dispersione, echo=TRUE}
+library(ggplot2)
+ggplot(Affairs_clean, aes(x = rating , y = affair)) +
+  geom_point(alpha = 0.5, color = "green") +  # Punti di dispersione con trasparenza
+  geom_smooth(method = "glm", method.args = list(family = "binomial"), se = FALSE, color = "red") +  # Curva di regressione logistica senza intervallo di confidenza
+  labs(title = "Regressione Logistica - relazioni extraconiugali",
+       x = "rating",
+       y = "affair") + theme_minimal()
+```
+
+
+Dopodichè, ci soffermiamo su un'analisi più approfondita dei **Residui**
+
+```{r Grafico dei residui, echo=TRUE}
+# Estrazione dei residui
+residuals_clean<-residuals(model2_interaction)
+```
+
+```{r Grafico dei Residui vs. Ordine delle Osservazioni, echo=TRUE}
+# Grafico dei Residui vs. Ordine delle Osservazioni
+plot(residuals_clean, type = "p", main = "Grafico dei Residui vs. Ordine delle Osservazioni", ylab = "Residui", xlab = "Ordine delle Osservazioni")
+abline(h = 0, col="red",lwd=3)
+```
+
+## **PCA**
+
+***Matrice scatterplot***
+
+1.  Caricamento delle librerie necessarie
+
+```{r}
+library(dplyr)
+library(GGally)
+library(ggplot2)
+```
+
+2.  Visualizzazione della struttura del dataset Affairs
+
+```{r}
+str(Affairs)
+```
+
+3.  Selezione delle variabili numeriche dal dataset Affairs
+
+```{r}
+dati_reg_no_dummy <- dplyr::select(Affairs, age, yearsmarried, religiousness, education, occupation, rating, affairs)
+```
+
+4.  Controllo della struttura dei dati selezionati
+
+```{r}
+class(dati_reg_no_dummy) <- "data.frame"
+```
+
+5.  Creazione della matrice scatterplot
+
+```{r}
+ggscatmat(dati_reg_no_dummy)
+```
+
+***Standardizzazione dei dati e analisi PCA***
+
+1.  Esecuzione dell'analisi PCA
+
+```{r}
+PCA2 <- princomp(dati_reg_no_dummy, cor = TRUE)
+```
+
+2.  Visualizzazione del sommario della PCA con i loadings
+
+```{r}
+print(summary(PCA2, loadings = TRUE), cutoff = .3)
+```
+
+***Correlazione variabili e componenti principali***
+
+1.  Caricamento della libreria ggplot2
+
+```{r}
+library(ggplot2)
+```
+
+2.  Calcolo e visualizzazione dell matrice di correlazione
+
+```{r}
+ggcorr(cbind(dati_reg_no_dummy, PCA2$scores), label = TRUE, cex = 2.5)
+
+```
+
+***Visualizzazione PCA***
+
+1.  Caricamento delle librerie FactoMineR e factoextra
+
+```{r}
+suppressPackageStartupMessages(library(FactoMineR))
+suppressPackageStartupMessages(library(factoextra))
+```
+
+2.  Scree plot delle componenti principali
+
+```{r}
+fviz_eig(PCA2, addlabels = TRUE, ylim = c(0, 70))
+```
+
+3.  Visualizzazione degli individui nella PCA
+
+```{r}
+fviz_pca_ind(PCA2,
+             axes = c(1, 2),
+             col.ind = "cos2", # Colore per la qualità della rappresentazione
+             gradient.cols = c("lightblue", "yellow", "red"),
+             repel = TRUE,
+             label = TRUE)
+```
+
+4.  Visualizzazione delle variabili nella PCA
+
+```{r}
+fviz_pca_var(PCA2,
+             axes = c(1, 2),
+             col.var = "contrib", # Colore per contributi alle PC
+             gradient.cols = c("lightblue", "yellow", "red"),
+             repel = TRUE) # Evita la sovrapposizione del testo
+```
+
+5.  Biplot delle variabili e degli individui nella PCA
+
+```{r}
+fviz_pca_biplot(PCA2, axes = c(1, 2),
+                label = "var",
+                repel = TRUE,
+                geom.ind = "point",
+                label.ind = FALSE)
+```
+
+6.  Creazione del biplot delle prime due componenti principali
+
+```{r}
+biplot(PCA2, choices = c(1, 2), cex = c(.7, .7), col = c("gray", "red"))
+```
+
+## ***Cluster analisi***
+
+**Configurazione dell'ambiente**
+
+```{r Carichiamo i pacchetti necessari, echo=TRUE}
+library(stats)
+suppressPackageStartupMessages(library(factoextra))
+library(cluster)
+```
+
+**Preparazione dei dati**
+
+```{r Prepariamo i dati, echo=TRUE}
+# Selezione delle colonne per il clustering
+vars <- Affairs[, c("age", "yearsmarried", "religiousness", "rating", "education", "occupation","children", "gender")]
+
+# Conversione di children e gender in variabili dummy
+vars$children <- as.factor(vars$children)
+vars$gender <- as.factor(vars$gender)
+
+# Creazione di variabili dummy
+vars_dummy <- model.matrix(~ . - 1, data = vars)
+
+# Esecuzione della PCA
+pca_result <- prcomp(vars_dummy, scale. = TRUE)
+summary(pca_result)
+
+# Estrazione delle prime due componenti principali
+pca_data <- pca_result$x[, 1:2]
+```
+
+**Determinazione del numero ottimale di cluster**
+
+```{r Determiniamo il numero ottimale di cluster, echo=TRUE}
+# Funzione di Calcolo del Punteggio di Silhouette
+silhouette_score <- function(k){
+  km <- kmeans(pca_data, centers = k, nstart = 25)
+  ss <- silhouette(km$cluster, dist(pca_data))
+  mean(ss[, 3])}
+
+# Definizione del Range di Cluster da Valutare
+k_values <- 2:10
+
+# Calcolo dei Punteggi di Silhouette per Ogni K
+avg_silhouette <- sapply(k_values, silhouette_score)
+
+# Identificazione del Numero Ottimale di Cluster
+optimal_k <- k_values[which.max(avg_silhouette)]
+```
+
+**Visualizzazione dei risultati**
+
+```{r Visualizzazione dei risultati, echo=TRUE}
+# Visualizzazione Grafica dei Punteggi di Silhouette
+plot(k_values, avg_silhouette, type = "b", pch = 19, frame = FALSE, 
+     xlab = "Numero di cluster (k)", ylab = "Silhouette media")
+
+# Marcatura del K Ottimale sul Grafico
+abline(v = optimal_k, lty = 2, col = "red", lwd=2)
+```
+
+**Esecuzione e visualizzazione del cluster k-means**
+
+```{r Eseguiamo e visualizziamo il cluster k-means, echo=TRUE}
+# Imposta il seme per la riproducibilità
+set.seed(123)
+
+# Esecuzione dell'algoritmo K-means
+km_result <- kmeans(pca_data, centers = optimal_k, nstart = 25)
+
+# Visualizzazione dei cluster
+fviz_cluster(km_result, data = pca_data,
+             palette = c("blue", "lightblue", "orange", "red", "brown"),
+             geom = "point",
+             ellipse.type = "convex", 
+             ggtheme = theme_bw())
+
+
+```
+
+**Valutazione della qualità del clustering**
+
+```{r Valutiamo la qualità del clustering, echo=TRUE}
+# Calcolo e visualizzazione del plot della silhouette
+sil <- silhouette(km_result$cluster, dist(pca_data))
+fviz_silhouette(sil,palette= c("blue","lightblue","orange")) + theme_minimal()
+```
+
+**Calcolo e visualizzazione delle medie delle variabili per ciascun Cluster**
+```{r}
+# Assegnazione dei cluster alle osservazioni
+cluster_assignments <- km_result$cluster
+
+# Aggiunta dell'assegnazione del cluster al dataset originale
+clustered_data <- cbind(vars, cluster = cluster_assignments)
+
+# Calcolo delle medie delle variabili per ciascun cluster
+cluster_means <- aggregate(. ~ cluster, data = clustered_data, FUN = mean)
+
+# Visualizzazione delle medie delle variabili per ciascun cluster
+print(cluster_means)
+```
+
+**Analisi delle Frequenze di Relazioni Extraconiugali per Cluster**
+```{r}
+# Aggiunta della variabile "affairs" al dataset
+clustered_data <- cbind(clustered_data, affairs = Affairs$affairs)
+# Calcolo delle frequenze di affair per ciascun cluster
+affair_freq <- table(clustered_data$cluster, clustered_data$affairs == 1)
+# Visualizzazione delle frequenze di affair per ciascun cluster
+print(affair_freq)
+```
+
+**Test del Chi-Quadrato su Frequenze di Relazioni Extraconiugali**
+```{r}
+# Test chi-quadrato
+chi_sq_test <- chisq.test(affair_freq)
+print(chi_sq_test)
+```
