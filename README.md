@@ -1,10 +1,21 @@
-# MSA-2025
-# Marriage Infidelity Rate Analysis – Final Exam Project
+## MSA-2025
+# Marriage Infidelity Rate Analysis – Academic Group Project
+**Course:** Advanced Statistical Methods
+**University:** Sapienza University of Rome
+**Programming Language:** R
 
 ## Project Overview
-This repository contains only a final examination project focused on the statistical analysis of marital infidelity.
+This repository contains only the final academic group project developed as part of the Advanced Statistical Methods course at Sapienza University of Rome.
 
-The project explores the relationship between marital infidelity rate and individual, demographic, and relationship-related characteristics, using quantitative methods and statistical analysis.
+The project investigates the relationship between marital infidelity and individual, demographic, and relationship-related characteristics through statistical analysis and multivariate techniques.
+
+## Statistical Methods
+Key methodologies include:
+- Exploratory Data Analysis (EDA): Descriptive statistics and graphical exploration of the dataset.
+- Principal Component Analysis (PCA): Dimensionality reduction to explore the underlying structure of the data.
+- Cluster Analysis: Identification of groups of observations with similar characteristics.
 
 ## Project Contents
-This repository contains the materials developed for the final examination project, completed as part of university coursework and is shared for educational and portfolio purposes.
+The repository includes the R Markdown source code and the corresponding HTML report, providing access to the statistical analyses, visualizations, and results.
+
+The materials are shared for educational and portfolio purposes.
